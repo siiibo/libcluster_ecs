@@ -28,8 +28,8 @@ defmodule ClusterEcs.MixProject do
   defp deps do
     [
       {:libcluster, "~> 2.0 or ~> 3.0"},
-      {:ex_aws, "~> 2.2.1"},
-      {:configparser_ex, "~> 4.0"},
+      {:ex_aws, "~> 2.2"},
+      {:configparser_ex, "~> 4.0", optional: true},
       {:hackney, "~> 1.9"},
       {:jason, ">= 1.1.0", optional: true},
       {:ex_doc, ">= 0.0.0", only: :dev}
