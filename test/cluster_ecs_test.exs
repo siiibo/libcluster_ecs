@@ -2,15 +2,12 @@ defmodule ClusterEcsTest do
   use ExUnit.Case
   alias Cluster.Strategy.State
 
-  @cluster_arn "arn:aws:ecs:us-east-2:915236037149:cluster/staging-ecs-cluster"
-
   test "missing config" do
-    state = %State {
+    state = %State{
       topology: ClusterEcs.Strategy,
       config: [
-        cluster: @cluster_arn,
-        region: "us-east-2",
-        app_prefix: "merlin",
+        cluster: cluster_arn(),
+        region: region()
       ]
     }
 
@@ -20,53 +17,76 @@ defmodule ClusterEcsTest do
   end
 
   test "misconfig" do
-    state = %State {
+    state = %State{
       topology: ClusterEcs.Strategy,
       config: [
-        cluster: @cluster_arn,
+        cluster: cluster_arn(),
         service_name: [""],
-        region: "us-east-2",
-        app_prefix: "merlin",
+        region: region()
       ]
     }
 
-    assert {:error, []} = ClusterEcs.Strategy.get_nodes(state)
+    assert {{:error, []}, log} = ExUnit.CaptureLog.with_log(fn -> ClusterEcs.Strategy.get_nodes(state) end)
+    assert log =~ "ECS strategy is selected, but service_name is not configured correctly!"
   end
 
-  # Need to figure out how to stub this out
-  test "gets those ips" do
-    state = %State {
+  test "gets those nodes" do
+    state = %State{
       topology: ClusterEcs.Strategy,
       config: [
-        cluster: @cluster_arn,
-        service_name: "-Dat2-",
-        region: "us-east-2",
-        app_prefix: "mega_maid",
+        cluster: cluster_arn(),
+        service_name: service(),
+        region: region()
       ]
     }
 
-    assert {:ok, ips} = ClusterEcs.Strategy.get_nodes(state)
-    assert MapSet.size(ips) == 2
-    for ip <- ips do
-      assert to_string(ip) =~ ~r/mega_maid@10\.1\.(\d{1,3})\.(\d{1,3})/
+    assert {:ok, nodes} = ClusterEcs.Strategy.get_nodes(state)
+    assert MapSet.size(nodes) > 0
+
+    for node <- nodes do
+      assert to_string(node) =~ ~r/app@\d{1,3}\.\d{1,3}\.(\d{1,3})\.(\d{1,3})/
     end
   end
 
-  test "gets ips from multiple tasks" do
-    state = %State {
+  test "gets ips from list of services (also, local part of node names can be configured)" do
+    state = %State{
       topology: ClusterEcs.Strategy,
       config: [
-        cluster: @cluster_arn,
-        service_name: ["-Merlin-", "-MerlinAdmin-"],
-        region: "us-east-2",
-        app_prefix: "merlin",
+        cluster: cluster_arn(),
+        service_name: [service()],
+        region: region(),
+        app_prefix: "custom"
       ]
     }
 
-    assert {:ok, ips} = ClusterEcs.Strategy.get_nodes(state)
-    assert MapSet.size(ips) == 2
-    for ip <- ips do
-      assert to_string(ip) =~ ~r/merlin@10\.1\.(\d{1,3})\.(\d{1,3})/
+    assert {:ok, nodes} = ClusterEcs.Strategy.get_nodes(state)
+    assert MapSet.size(nodes) > 0
+
+    for node <- nodes do
+      assert to_string(node) =~ ~r/custom@\d{1,3}\.\d{1,3}\.(\d{1,3})\.(\d{1,3})/
     end
+  end
+
+  # Since this package does not provide nor depend on full-featured ExAws.Ecs, we rely on aws-cli for testing.
+  defp get_raw_string_via_aws_cli(args) do
+    {output, 0} = System.cmd("aws", args)
+    output |> String.trim() |> String.trim("\"")
+  end
+
+  # Your aws cli config must have default region to test.
+  defp region(), do: get_raw_string_via_aws_cli(~W(configure get region))
+
+  # Use random-found cluster as a test fixture. You must have one to test.
+  defp cluster_arn() do
+    get_raw_string_via_aws_cli(~W(ecs list-clusters --query=clusterArns))
+    |> Jason.decode!()
+    |> Enum.random()
+  end
+
+  # Use random-found service as a test fixture. You must have one in the cluster to test.
+  defp service() do
+    get_raw_string_via_aws_cli(~w(ecs list-services --cluster=#{cluster_arn()} --query=serviceArns))
+    |> Jason.decode!()
+    |> Enum.random()
   end
 end
