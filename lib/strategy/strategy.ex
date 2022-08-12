@@ -123,7 +123,7 @@ defmodule ClusterEcs.Strategy do
       {:ok, desc_task_body} <- describe_tasks(cluster, task_arns, region),
       {:ok, ips} <- extract_ips(desc_task_body)
     ) do
-      {:ok, Enum.into(ips, MapSet.new(), & ip_to_nodename(&1, app_prefix))}
+      {:ok, Enum.into(ips, MapSet.new(), &ip_to_nodename(&1, app_prefix))}
     else
       {:config, field, _} ->
         warn(topology, "ECS strategy is selected, but #{field} is not configured correctly!")
@@ -139,8 +139,8 @@ defmodule ClusterEcs.Strategy do
 
   defp config_string?(_), do: false
 
-  defp name_configured?([_|_] = names) do
-    Enum.all?(names, & name_configured?/1)
+  defp name_configured?([_ | _] = names) do
+    Enum.all?(names, &name_configured?/1)
   end
 
   defp name_configured?(name), do: config_string?(name)
@@ -165,36 +165,41 @@ defmodule ClusterEcs.Strategy do
 
   defp list_services(cluster, region) do
     params = %{
-      "cluster" => cluster,
+      "cluster" => cluster
     }
+
     query("ListServices", params)
     |> ExAws.request(region: region)
     |> list_services(cluster, region, [])
   end
 
-  defp list_services({:ok, %{"nextToken" => next_token, "serviceArns" => service_arns}}, cluster, region, accum) when not is_nil(next_token) do
+  defp list_services({:ok, %{"nextToken" => next_token, "serviceArns" => service_arns}}, cluster, region, accum)
+       when not is_nil(next_token) do
     params = %{
       "cluster" => cluster,
-      "nextToken" => next_token,
+      "nextToken" => next_token
     }
+
     query("ListServices", params)
     |> ExAws.request(region: region)
     |> list_services(cluster, region, accum ++ service_arns)
   end
+
   defp list_services({:ok, %{"serviceArns" => service_arns}}, _cluster, _region, accum) do
     {:ok, %{"serviceArns" => accum ++ service_arns}}
   end
+
   defp list_services({:error, message}, _cluster, _region, _accum) do
     {:error, message}
   end
-
 
   defp list_tasks(cluster, service_arn, region) do
     params = %{
       "cluster" => cluster,
       "serviceName" => service_arn,
-      "desiredStatus" => "RUNNING",
+      "desiredStatus" => "RUNNING"
     }
+
     query("ListTasks", params)
     |> ExAws.request(region: region)
   end
@@ -202,8 +207,9 @@ defmodule ClusterEcs.Strategy do
   defp describe_tasks(cluster, task_arns, region) do
     params = %{
       "cluster" => cluster,
-      "tasks" => task_arns,
+      "tasks" => task_arns
     }
+
     query("DescribeTasks", params)
     |> ExAws.request(region: region)
   end
@@ -217,7 +223,7 @@ defmodule ClusterEcs.Strategy do
         headers: [
           {"accept-encoding", "identity"},
           {"x-amz-target", "#{@namespace}.#{action}"},
-          {"content-type", "application/x-amz-json-1.1"},
+          {"content-type", "application/x-amz-json-1.1"}
         ]
       }
     )
@@ -232,27 +238,31 @@ defmodule ClusterEcs.Strategy do
   defp find_service_arn(service_arns, service_name) when is_list(service_arns) do
     with {:ok, regex} <- Regex.compile(service_name) do
       service_arns
-      |> Enum.find(&(Regex.match?(regex, &1)))
+      |> Enum.find(&Regex.match?(regex, &1))
       |> case do
         nil ->
           Logger.error("no service matching #{service_name} found")
           {:error, "no service matching #{service_name} found"}
+
         arn ->
           {:ok, arn}
       end
     end
   end
+
   defp find_service_arn(_, _), do: {:error, "no service arns returned"}
 
   defp extract_ips(%{"tasks" => tasks}) do
     ips =
       tasks
-      |> Enum.flat_map(fn(t) -> Map.get(t, "containers", []) end)
-      |> Enum.flat_map(fn(c) -> Map.get(c, "networkInterfaces", []) end)
-      |> Enum.map(fn(ni) -> Map.get(ni, "privateIpv4Address") end)
+      |> Enum.flat_map(fn t -> Map.get(t, "containers", []) end)
+      |> Enum.flat_map(fn c -> Map.get(c, "networkInterfaces", []) end)
+      |> Enum.map(fn ni -> Map.get(ni, "privateIpv4Address") end)
       |> Enum.reject(&is_nil/1)
+
     {:ok, ips}
   end
+
   defp extract_ips(_), do: {:error, "can't extract ips"}
 
   defp ip_to_nodename(ip, app_prefix) do
