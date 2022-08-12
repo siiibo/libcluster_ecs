@@ -66,6 +66,7 @@ defmodule ClusterEcs.Strategy do
   def handle_info(:load, %State{topology: topology, connect: connect, disconnect: disconnect, list_nodes: list_nodes} = state) do
     case get_nodes(state) do
       {:ok, new_nodelist} ->
+        new_nodelist = MapSet.new(new_nodelist)
         added = MapSet.difference(new_nodelist, state.meta)
         removed = MapSet.difference(state.meta, new_nodelist)
 
