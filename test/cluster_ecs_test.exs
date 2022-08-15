@@ -2,11 +2,15 @@ defmodule ClusterEcsTest do
   use ExUnit.Case
   alias Cluster.Strategy.State
 
-  test "missing config" do
+  setup_all do
+    %{cluster: cluster_arn()}
+  end
+
+  test "missing config", context do
     state = %State{
       topology: ClusterEcs.Strategy,
       config: [
-        cluster: cluster_arn(),
+        cluster: context.cluster,
         region: region()
       ]
     }
@@ -16,11 +20,11 @@ defmodule ClusterEcsTest do
     end
   end
 
-  test "misconfig" do
+  test "misconfig", context do
     state = %State{
       topology: ClusterEcs.Strategy,
       config: [
-        cluster: cluster_arn(),
+        cluster: context.cluster,
         service_name: [""],
         region: region()
       ]
@@ -30,12 +34,12 @@ defmodule ClusterEcsTest do
     assert log =~ "ECS strategy is selected, but service_name is not configured correctly!"
   end
 
-  test "gets those nodes" do
+  test "gets those nodes", context do
     state = %State{
       topology: ClusterEcs.Strategy,
       config: [
-        cluster: cluster_arn(),
-        service_name: service(),
+        cluster: context.cluster,
+        service_name: service(context.cluster),
         region: region()
       ]
     }
@@ -48,12 +52,12 @@ defmodule ClusterEcsTest do
     end
   end
 
-  test "gets ips from list of services (also, local part of node names can be configured)" do
+  test "gets ips from list of services (also, local part of node names can be configured)", context do
     state = %State{
       topology: ClusterEcs.Strategy,
       config: [
-        cluster: cluster_arn(),
-        service_name: [service()],
+        cluster: context.cluster,
+        service_name: [service(context.cluster)],
         region: region(),
         app_prefix: "custom"
       ]
@@ -84,8 +88,8 @@ defmodule ClusterEcsTest do
   end
 
   # Use random-found service as a test fixture. You must have one in the cluster to test.
-  defp service() do
-    get_raw_string_via_aws_cli(~w(ecs list-services --cluster=#{cluster_arn()} --query=serviceArns))
+  defp service(cluster) do
+    get_raw_string_via_aws_cli(~w(ecs list-services --cluster=#{cluster} --query=serviceArns))
     |> Jason.decode!()
     |> Enum.random()
   end
