@@ -261,10 +261,28 @@ defmodule ClusterEcs.Strategy do
       |> Enum.map(fn ni -> Map.get(ni, "privateIpv4Address") end)
       |> Enum.reject(&is_nil/1)
 
-    {:ok, ips}
+    # This is also done in the official Strategy such as DnsPoll
+    # https://github.com/bitwalker/libcluster/blob/b8e3a13603539621c871ec9c8c3aece79856f31e/lib/strategy/dns_poll.ex#L117-L129
+    # Limitation: Here we reject ECS Tasks based on Tasks' private IPs, meaning we cannot have multiple (but differently named) Erlang nodes in a single ECS Task
+    case get_self_private_ip_from_hostname() do
+      nil -> {:ok, ips}
+      me -> {:ok, Enum.reject(ips, &(&1 == me))}
+    end
   end
 
   defp extract_ips(_), do: {:error, "can't extract ips"}
+
+  defp get_self_private_ip_from_hostname() do
+    with(
+      {:ok, hostname_charlist} <- :inet.gethostname(),
+      # Default hostnames of ECS Tasks are in the form of "ip-xxx-xxx-xxx-xxx" and contains their private IPs
+      "ip-" <> hyphenated_ip <- List.to_string(hostname_charlist)
+    ) do
+      String.replace(hyphenated_ip, "-", ".")
+    else
+      _not_in_ECS_task_or_hostname_unavailable -> nil
+    end
+  end
 
   defp ip_to_nodename(ip, app_prefix) do
     :"#{app_prefix}@#{ip}"
