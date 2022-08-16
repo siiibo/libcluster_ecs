@@ -45,10 +45,10 @@ defmodule ClusterEcsTest do
     }
 
     assert {:ok, nodes} = ClusterEcs.Strategy.get_nodes(state)
-    assert MapSet.size(nodes) > 0
+    assert length(nodes) > 0
 
     for node <- nodes do
-      assert to_string(node) =~ ~r/app@\d{1,3}\.\d{1,3}\.(\d{1,3})\.(\d{1,3})/
+      assert to_string(node) =~ ~r/app@ip-\d{1,3}-\d{1,3}-(\d{1,3})-(\d{1,3})\.(?<region>.+)\.compute\.internal/
     end
   end
 
@@ -64,10 +64,10 @@ defmodule ClusterEcsTest do
     }
 
     assert {:ok, nodes} = ClusterEcs.Strategy.get_nodes(state)
-    assert MapSet.size(nodes) > 0
+    assert length(nodes) > 0
 
     for node <- nodes do
-      assert to_string(node) =~ ~r/custom@\d{1,3}\.\d{1,3}\.(\d{1,3})\.(\d{1,3})/
+      assert to_string(node) =~ ~r/custom@ip-\d{1,3}-\d{1,3}-(\d{1,3})-(\d{1,3})\.(?<region>.+)\.compute\.internal/
     end
   end
 
