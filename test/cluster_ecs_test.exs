@@ -71,6 +71,23 @@ defmodule ClusterEcsTest do
     end
   end
 
+  test "gets resources from cluster", context do
+    # This test shows how to use functions to get resources (Their functions were private in original repository)
+    region = region()
+    {:ok, services} = ClusterEcs.Strategy.list_services(context.cluster, region)
+    {:ok, service_arns} = ClusterEcs.Strategy.extract_service_arns(services)
+    assert length(service_arns) > 0
+
+    for service_arn <- service_arns do
+      {:ok, tasks} = ClusterEcs.Strategy.list_tasks(context.cluster, service_arn, region)
+      {:ok, task_arns} = ClusterEcs.Strategy.extract_task_arns(tasks)
+      assert length(task_arns) > 0
+
+      desc_tasks = ClusterEcs.Strategy.describe_tasks(context.cluster, task_arns, region)
+      assert match?({:ok, _}, desc_tasks)
+    end
+  end
+
   # Since this package does not provide nor depend on full-featured ExAws.Ecs, we rely on aws-cli for testing.
   defp get_raw_string_via_aws_cli(args) do
     {output, 0} = System.cmd("aws", args)
