@@ -172,7 +172,7 @@ defmodule ClusterEcs.Strategy do
     end)
   end
 
-  defp list_services(cluster, region) do
+  def list_services(cluster, region) do
     params = %{
       "cluster" => cluster
     }
@@ -182,7 +182,7 @@ defmodule ClusterEcs.Strategy do
     |> list_services(cluster, region, [])
   end
 
-  defp list_services({:ok, %{"nextToken" => next_token, "serviceArns" => service_arns}}, cluster, region, accum)
+  def list_services({:ok, %{"nextToken" => next_token, "serviceArns" => service_arns}}, cluster, region, accum)
        when not is_nil(next_token) do
     params = %{
       "cluster" => cluster,
@@ -194,15 +194,15 @@ defmodule ClusterEcs.Strategy do
     |> list_services(cluster, region, accum ++ service_arns)
   end
 
-  defp list_services({:ok, %{"serviceArns" => service_arns}}, _cluster, _region, accum) do
+  def list_services({:ok, %{"serviceArns" => service_arns}}, _cluster, _region, accum) do
     {:ok, %{"serviceArns" => accum ++ service_arns}}
   end
 
-  defp list_services({:error, message}, _cluster, _region, _accum) do
+  def list_services({:error, message}, _cluster, _region, _accum) do
     {:error, message}
   end
 
-  defp list_tasks(cluster, service_arn, region) do
+  def list_tasks(cluster, service_arn, region) do
     params = %{
       "cluster" => cluster,
       "serviceName" => service_arn,
@@ -213,7 +213,7 @@ defmodule ClusterEcs.Strategy do
     |> ExAws.request(region: region)
   end
 
-  defp describe_tasks(cluster, task_arns, region) do
+  def describe_tasks(cluster, task_arns, region) do
     params = %{
       "cluster" => cluster,
       "tasks" => task_arns
@@ -238,11 +238,11 @@ defmodule ClusterEcs.Strategy do
     )
   end
 
-  defp extract_task_arns(%{"taskArns" => arns}), do: {:ok, arns}
-  defp extract_task_arns(_), do: {:error, "unknown task arns response"}
+  def extract_task_arns(%{"taskArns" => arns}), do: {:ok, arns}
+  def extract_task_arns(_), do: {:error, "unknown task arns response"}
 
-  defp extract_service_arns(%{"serviceArns" => arns}), do: {:ok, arns}
-  defp extract_service_arns(_), do: {:error, "unknown service arns response"}
+  def extract_service_arns(%{"serviceArns" => arns}), do: {:ok, arns}
+  def extract_service_arns(_), do: {:error, "unknown service arns response"}
 
   defp find_service_arn(service_arns, service_name) when is_list(service_arns) do
     with {:ok, regex} <- Regex.compile(service_name) do
