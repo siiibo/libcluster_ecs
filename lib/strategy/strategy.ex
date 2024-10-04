@@ -41,7 +41,7 @@ defmodule ClusterEcs.Strategy do
   def init([%State{} = state]) do
     state = state |> Map.put(:meta, MapSet.new())
 
-    {:ok, state, 0}
+    {:ok, load(state)}
   end
 
   # libcluster ~> 2.0
@@ -55,7 +55,7 @@ defmodule ClusterEcs.Strategy do
       meta: MapSet.new([])
     }
 
-    {:ok, state, 0}
+    {:ok, load(state)}
   end
 
   @impl true
@@ -63,11 +63,18 @@ defmodule ClusterEcs.Strategy do
     handle_info(:load, state)
   end
 
-  def handle_info(:load, %State{topology: topology, connect: connect, disconnect: disconnect, list_nodes: list_nodes} = state) do
+  def handle_info(:load, %State{} = state) do
+    {:noreply, load(state)}
+  end
+
+  def handle_info(_, state) do
+    {:noreply, state}
+  end
+
+  defp load(%State{topology: topology, connect: connect, disconnect: disconnect, list_nodes: list_nodes} = state) do
     case get_nodes(state) do
       {:ok, new_nodelist} ->
         new_nodelist = MapSet.new(new_nodelist)
-        added = MapSet.difference(new_nodelist, state.meta)
         removed = MapSet.difference(state.meta, new_nodelist)
 
         new_nodelist =
@@ -83,7 +90,7 @@ defmodule ClusterEcs.Strategy do
           end
 
         new_nodelist =
-          case Cluster.Strategy.connect_nodes(topology, connect, list_nodes, MapSet.to_list(added)) do
+          case Cluster.Strategy.connect_nodes(topology, connect, list_nodes, MapSet.to_list(new_nodelist)) do
             :ok ->
               new_nodelist
 
@@ -95,19 +102,15 @@ defmodule ClusterEcs.Strategy do
           end
 
         Process.send_after(self(), :load, Keyword.get(state.config, :polling_interval, @default_polling_interval))
-        {:noreply, %{state | :meta => new_nodelist}}
+        %{state | :meta => new_nodelist}
 
       _ ->
         Process.send_after(self(), :load, Keyword.get(state.config, :polling_interval, @default_polling_interval))
-        {:noreply, state}
+        state
     end
   end
 
-  def handle_info(_, state) do
-    {:noreply, state}
-  end
-
-  @spec get_nodes(State.t()) :: {:ok, [atom()]} | {:error, []}
+  @spec get_nodes(State.t()) :: {:ok, MapSet.t()} | {:error, any()}
   def get_nodes(%State{topology: topology, config: config}) do
     region = Keyword.fetch!(config, :region)
     cluster = Keyword.fetch!(config, :cluster)
@@ -135,12 +138,14 @@ defmodule ClusterEcs.Strategy do
       {:ok, all_nodes -- [me]}
     else
       {:config, field, _} ->
-        warn(topology, "ECS strategy is selected, but #{field} is not configured correctly!")
-        {:error, []}
+        message = "ECS strategy is selected, but #{field} is not configured correctly!"
+        warn(topology, message)
+        {:error, message}
 
       err ->
-        warn(topology, "Error #{inspect(err)} while determining nodes in cluster via ECS strategy.")
-        {:error, []}
+        message = "Error #{inspect(err)} while determining nodes in cluster via ECS strategy."
+        warn(topology, message)
+        {:error, message}
     end
   end
 
@@ -154,6 +159,7 @@ defmodule ClusterEcs.Strategy do
 
   defp name_configured?(name), do: config_string?(name)
 
+  @spec get_tasks_for_services(binary(), binary(), list(binary()), list(binary())) :: {:ok, list(binary())} | {:error, any()}
   defp get_tasks_for_services(cluster, region, service_arns, service_names) do
     Enum.reduce(service_names, {:ok, []}, fn service_name, acc ->
       case acc do
@@ -177,7 +183,8 @@ defmodule ClusterEcs.Strategy do
       "cluster" => cluster
     }
 
-    query("ListServices", params)
+    "ListServices"
+    |> query(params)
     |> ExAws.request(region: region)
     |> list_services(cluster, region, [])
   end
@@ -189,7 +196,8 @@ defmodule ClusterEcs.Strategy do
       "nextToken" => next_token
     }
 
-    query("ListServices", params)
+    "ListServices"
+    |> query(params)
     |> ExAws.request(region: region)
     |> list_services(cluster, region, accum ++ service_arns)
   end
@@ -209,7 +217,8 @@ defmodule ClusterEcs.Strategy do
       "desiredStatus" => "RUNNING"
     }
 
-    query("ListTasks", params)
+    "ListTasks"
+    |> query( params)
     |> ExAws.request(region: region)
   end
 
@@ -219,7 +228,8 @@ defmodule ClusterEcs.Strategy do
       "tasks" => task_arns
     }
 
-    query("DescribeTasks", params)
+    "DescribeTasks"
+    |> query(params)
     |> ExAws.request(region: region)
   end
 
