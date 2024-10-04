@@ -30,7 +30,7 @@ defmodule ClusterEcsTest do
       ]
     }
 
-    assert {{:error, []}, log} = ExUnit.CaptureLog.with_log(fn -> ClusterEcs.Strategy.get_nodes(state) end)
+    assert {{:error, "ECS strategy is selected, but service_name is not configured correctly!"}, log} = ExUnit.CaptureLog.with_log(fn -> ClusterEcs.Strategy.get_nodes(state) end)
     assert log =~ "ECS strategy is selected, but service_name is not configured correctly!"
   end
 
