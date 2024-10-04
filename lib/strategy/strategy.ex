@@ -110,7 +110,7 @@ defmodule ClusterEcs.Strategy do
     end
   end
 
-  @spec get_nodes(State.t()) :: {:ok, MapSet.t()} | {:error, any()}
+  @spec get_nodes(State.t()) :: {:ok, [atom()]} | {:error, any()}
   def get_nodes(%State{topology: topology, config: config}) do
     region = Keyword.fetch!(config, :region)
     cluster = Keyword.fetch!(config, :cluster)
